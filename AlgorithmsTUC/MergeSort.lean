@@ -94,22 +94,82 @@ by
         rw [← hres, ← Nat.add_assoc 1 1 _, Nat.add_comm (1+1)]
         simp
 
-def split (l: List A) (n: ℕ): List A × List A :=
+--inspired by haskells terminology
+def take (l: List A)(n: ℕ): List A :=
   match n with
-  | 0 => ([], l)
+  | 0 => []
   | Nat.succ m =>
     match l with
-    | [] => ([], [])
-    | hd::tl =>
-      let res := split tl m
+    | [] => []
+    | hd::tl => hd::(take tl m)
 
-      (hd::res.1, res.2)
+lemma take_length (l: List A)(n: ℕ)(h: n ≤ l.length): (take l n).length = n := by
+  induction n generalizing l with
+  | zero => simp[take]
+  | succ m ih =>
+    cases l with
+    | nil => simp at h
+    | cons hd tl =>
+      simp[take]
+      simp at h
+      apply ih tl h
 
-lemma splitLen1 (l: List A): (split l (Nat.div l.length 2)).1.length < l.length := by
-  sorry
 
-lemma splitLen2 (l: List A): (split l (Nat.div l.length 2)).2.length < l.length := by
-  sorry
+def drop (l: List A)(n: ℕ): List A :=
+  match n with
+  | 0 => l
+  | Nat.succ m =>
+    match l with
+    | [] => []
+    | _::tl => drop tl m
+
+lemma drop_length (l: List A)(n: ℕ)(h: n ≤ l.length): (drop l n).length = l.length - n := by
+  induction n generalizing l with
+  | zero => simp[drop]
+  | succ m ih =>
+    cases l with
+    | nil => simp at h
+    | cons hd tl =>
+      simp[drop]
+      simp at h
+      apply ih tl h
+
+def split (l: List A) (n: ℕ): List A × List A := (take l n, drop l n)
+
+--#eval split [1,2,3,4,5] 2
+
+lemma splitLen1 (l: List A) (h: l.length > 0): (split l (Nat.div l.length 2)).1.length < l.length := by
+  unfold split
+  simp
+  rw [take_length]
+  apply Nat.div2_smaller_self l.length
+  exact h
+  apply le_of_lt
+  apply Nat.div2_smaller_self l.length
+  exact h
+
+lemma splitLen2 (l: List A) (h: l.length > 1): (split l (Nat.div l.length 2)).2.length < l.length := by
+  unfold split
+  simp
+  rw [drop_length]
+  apply Nat.sub_lt_left_of_lt_add
+  apply le_of_lt
+  apply Nat.div2_smaller_self l.length
+  apply Nat.zero_lt_of_lt
+  apply h
+
+  apply Nat.lt_of_lt_of_le (m:= l.length.succ)
+  simp
+  rw [Nat.succ_eq_add_one, Nat.add_comm]
+  apply Nat.add_le_add_right
+  admit
+
+  apply le_of_lt
+  apply Nat.div2_smaller_self l.length
+  apply Nat.zero_lt_of_lt
+  apply h
+
+
 
 def MergeSort (l: List A) : (List A × ℕ) :=
   if l.length <= 1
@@ -127,6 +187,30 @@ def MergeSort (l: List A) : (List A × ℕ) :=
 termination_by l.length
 decreasing_by
   simp_wf
+  rename_i h
   apply splitLen1
+  apply Nat.gt_0_of_not_le_1 l.length h
   simp_wf
   apply splitLen2
+  rename_i h
+  simp at h
+  exact h
+
+lemma mergeSortKeepsLength (l: List A): l.length = (MergeSort l).1.length := by
+  induction l.length using Nat.strongInductionOn generalizing l
+  sorry
+
+def isWorstCaseMergeSort (l: List A): Prop :=
+  if l.length <= 1
+  then True
+  else
+    let split := split l (Nat.div l.length 2)
+    let leftResult := MergeSort split.1
+    let rightResult := MergeSort split.2
+
+    isWorstCaseMergeSort leftResult.1 ∧ isWorstCaseMergeSort rightResult.1 ∧ (merge leftResult.1 rightResult.1).2 = (leftResult.1.length + rightResult.1.length - 1)
+termination_by l.length
+decreasing_by
+  simp_wf
+  sorry
+  sorry
