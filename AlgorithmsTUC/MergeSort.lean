@@ -1,6 +1,7 @@
 import AlgorithmsTUC.Basic
+import Mathlib.Data.Prod.Basic
 
-namespace MergeSort
+namespace MergeSortTUC
 variable {A: Type u}[LinearOrder A]
 
 def merge (l1 l2: List A): List A × ℕ :=
@@ -21,75 +22,77 @@ def merge (l1 l2: List A): List A × ℕ :=
 
 lemma mergeWorstCase (l1 l2 result: List A) (steps: ℕ) (hlen: l1.length = l2.length) (hsort: ∀ (i: ℕ) (hi: i < l1.length), l1.get (Fin.mk i hi) < l2.get  ⟨i, by rw [hlen] at hi; exact hi⟩) (hsort': ∀ (i: ℕ) (hi: i.succ < l1.length), l2.get ⟨i, by rw [hlen] at hi; apply Nat.lt_of_succ_lt hi⟩ < l1.get ⟨i.succ, hi⟩) (hres: merge l1 l2 = (result, steps)): steps = l1.length + l2.length - 1 :=
 by
-  induction' h: l1.length + l2.length using Nat.strongInductionOn generalizing l1 l2 result steps
-  rename_i n ih
-  cases l1 with
+  induction l1 generalizing l2 result steps with
   | nil =>
     cases l2 with
     | nil =>
-      unfold merge at hres
-      simp at hres
-      simp at h
-      rw [← h,←  And.right hres]
-    | cons hd tl => contradiction
-  | cons hd tl =>
+      simp
+      simp[merge] at hres
+      apply Eq.symm (And.right hres)
+    | cons hd tl =>
+      simp at hlen
+  | cons hd tl ih =>
     cases l2 with
-    | nil => contradiction
+    | nil =>
+      simp at hlen
     | cons hd' tl' =>
       simp[merge] at hres
       have hd_lt_hd': hd < hd' := by
         specialize hsort 0
         simp at hsort
         exact hsort
-      simp[hd_lt_hd'] at hres
+      simp [hd_lt_hd'] at hres
       cases tl with
       | nil =>
-        simp[merge] at hres
-        rw [← And.right hres]
         cases tl' with
         | nil =>
-          simp at h
-          rw [← h]
-        | cons hdtl tltl =>
+          simp[merge] at hres
+          rw [← And.right hres]
+          simp
+        | cons hdtl' tltl' =>
           simp at hlen
       | cons hdtl tltl =>
-        unfold merge at hres
-        simp at hres
-        simp at h
-
-        have not_hdtl_lt_hd': ¬ hdtl < hd' := by
+        simp[merge] at hres
+        have n_hdtl_lt_hd': ¬ hdtl < hd' := by
+          intro h
+          apply lt_total hdtl hd' h
           specialize hsort' 0
           simp at hsort'
-          apply lt_total hd' hdtl hsort'
-        rcases hres with ⟨_, hsteps⟩
-        rw [← hsteps]
-        simp [not_hdtl_lt_hd']
-        specialize ih (n-2)
-        have n_minus_2: n - 2 < n := by
-          rw [← h]
-          simp
-        specialize ih n_minus_2 (hdtl::tltl) tl' (merge (hdtl :: tltl) tl').1 (merge (hdtl :: tltl) tl').2
+          exact hsort'
+        simp[n_hdtl_lt_hd'] at hres
+        simp
+        rcases hres with ⟨_, hres⟩
         simp at hlen
+        specialize ih tl' (merge (hdtl::tltl) tl').1 (steps-2)
         simp at ih
         specialize ih hlen
-        rw [ih]
-        rw [add_add_sub_add]
-        apply ge_three _ _ _ h
+        rw [Nat.add_assoc _ 1 1, Nat.add_comm _ (1+1), Nat.add_assoc, ← ih]
+        simp
+        apply Eq.symm
+        apply Nat.add_sub_of_le
+        rw [← Nat.add_assoc] at hres
+        simp at hres
+        apply Nat.le.intro hres
 
+        --Preservation of hsort and hsort'
         intro i hi
         specialize hsort i.succ
         simp at hsort
-        specialize hsort hi
-        exact hsort
+        apply hsort hi
 
         intro i hi
         specialize hsort' i.succ
         simp at hsort'
-        apply hsort'
-        exact hi
+        apply hsort' hi
 
-        rw [← h]
-        apply MergeSort.add3
+        -- we used the correct result
+        rw [Prod.eq_iff_fst_eq_snd_eq]
+        constructor
+        simp
+
+        simp
+        rw [← hres, ← Nat.add_assoc 1 1 _, Nat.add_comm (1+1)]
+        simp
 
 def split (l: List A) (n: ℕ): List A × List A :=
   match n with
