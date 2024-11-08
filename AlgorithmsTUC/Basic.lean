@@ -1,5 +1,6 @@
 import Mathlib.Order.Defs
 import Mathlib.Data.Nat.Defs
+import Mathlib.Tactic
 
 
 theorem lt_total{A: Type u}[LinearOrder A] (a b: A): a < b → b < a → False := by

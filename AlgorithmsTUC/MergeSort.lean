@@ -4,6 +4,12 @@ import Mathlib.Data.Prod.Basic
 namespace MergeSortTUC
 variable {A: Type u}[LinearOrder A]
 
+def sorted (l: List A): Prop := List.Pairwise (fun a b => a ≤ b) l
+
+lemma sorted_of_cons {hd: A} {tl: List A} (h: sorted (hd::tl)): sorted tl := by
+  simp[sorted] at *
+  exact And.right h
+
 def merge (l1 l2: List A): List A × ℕ :=
   match l1 with
   | [] =>
@@ -94,6 +100,223 @@ by
         rw [← hres, ← Nat.add_assoc 1 1 _, Nat.add_comm (1+1)]
         simp
 
+lemma mem_merge (l1 l2: List A) (a:A): a ∈ (merge l1 l2).1 ↔ a ∈ l1 ∨ a ∈ l2 := by
+  induction' h:l1.length+l2.length with n ih generalizing l1 l2
+  · cases l1 with
+    | nil =>
+      cases l2 with
+      | nil => simp[merge]
+      | cons hd tl => simp at h
+    | cons hd tl => simp at h
+
+  · cases l1 with
+    | nil =>
+      cases l2 with
+      | nil => simp at h
+      | cons hd tl => simp[merge]
+    | cons hd tl =>
+      cases l2 with
+      | nil => simp[merge]
+      | cons hd' tl' =>
+        simp[merge]
+        split
+        · rename_i hd_hd'
+          simp
+          rw [ih]
+          simp
+          tauto
+          simp
+          simp at h
+          rw [← Nat.add_assoc, ← Nat.succ_eq_add_one, ← Nat.succ_eq_add_one n ] at h
+          simp at h
+          rw [← h]
+          rw [← Nat.add_assoc, Nat.add_assoc tl.length 1 _, Nat.add_comm 1 tl'.length, ← Nat.add_assoc]
+
+        · rename_i hd_hd'
+          simp
+          rw [ih]
+          simp
+          tauto
+          simp
+          simp at h
+          rw [← Nat.add_assoc, ← Nat.succ_eq_add_one, ← Nat.succ_eq_add_one n ] at h
+          simp at h
+          rw [← h]
+
+
+lemma merge_sorted_of_sorted (l1 l2: List A) (h1: sorted l1) (h2: sorted l2): sorted (merge l1 l2).1 := by
+  unfold sorted
+  induction' h:l1.length+l2.length with n ih generalizing l1 l2
+  cases l1 with
+  | nil =>
+    cases l2 with
+    | nil => simp[merge]
+    | cons hd tl => simp at h
+  | cons hd tl => simp at h
+
+  cases l1 with
+  | nil =>
+    cases l2 with
+    | nil => simp at h
+    | cons hd tl =>
+      unfold merge
+      apply h2
+  | cons hd tl =>
+    cases l2 with
+    | nil =>
+      unfold merge
+      simp only
+      apply h1
+    | cons hd' tl' =>
+      unfold merge
+      simp
+      split
+      · rename_i hd_hd'
+        simp
+        constructor
+        · intro a
+          rw [mem_merge]
+          intro a_mem
+          cases a_mem with
+          | inl a_mem =>
+            simp[sorted] at h1
+            apply And.left h1 a a_mem
+          | inr a_mem =>
+            simp at a_mem
+            cases a_mem with
+            | inl a_mem =>
+              rw [a_mem]
+              apply le_of_lt hd_hd'
+            | inr a_mem =>
+              apply le_trans (le_of_lt hd_hd')
+              simp[sorted] at h2
+              apply And.left h2 a a_mem
+        · apply ih
+          apply sorted_of_cons h1
+          exact h2
+          simp at h
+          rw [← Nat.add_assoc, ← Nat.succ_eq_add_one, ← Nat.succ_eq_add_one n ] at h
+          simp
+          simp at h
+          rw [← h]
+          rw [← Nat.add_assoc, Nat.add_assoc tl.length 1 _, Nat.add_comm 1 tl'.length, ← Nat.add_assoc]
+      · rename_i hd_hd'
+        simp at hd_hd'
+        simp
+        constructor
+        · intro a
+          rw [mem_merge]
+          simp
+          intro a_mem
+          cases a_mem with
+          | inl a_mem =>
+            cases a_mem with
+            | inl a_mem =>
+              simp[a_mem, hd_hd']
+            | inr a_mem =>
+              apply le_trans hd_hd'
+              simp[sorted] at h1
+              apply And.left h1 a a_mem
+          | inr a_mem =>
+            simp[sorted] at h2
+            apply And.left h2 a a_mem
+        · apply ih _ _ h1 (sorted_of_cons h2)
+          simp at h
+          rw [← Nat.add_assoc, ← Nat.succ_eq_add_one, ← Nat.succ_eq_add_one n ] at h
+          simp
+          simp at h
+          rw [← h]
+
+lemma merge_length (l1 l2: List A): (merge l1 l2).1.length = l1.length + l2.length := by
+  induction' h:l1.length+l2.length with n ih generalizing l1 l2
+  · cases l1 with
+    | nil =>
+      cases l2 with
+      | nil => simp[merge]
+      | cons hd tl => simp at h
+    | cons hd tl => simp at h
+
+  · cases l1 with
+    | nil =>simp[← h, merge]
+    | cons hd tl =>
+      cases l2 with
+      | nil => simp[← h, merge]
+      | cons hd' tl' =>
+        unfold merge
+        simp
+        split
+        simp
+        apply ih
+        simp at h
+        simp [← Nat.add_assoc] at h
+        simp
+        rw [Nat.add_comm tl'.length, ← Nat.add_assoc]
+        exact h
+
+        simp
+        apply ih
+        simp at h
+        simp [← Nat.add_assoc] at h
+        simp
+        exact h
+
+lemma merge_steps_strict_monotonic_map (l1 l2: List A) (f: A → A) (strictMonotone: ∀ (a b:A), a < b → f a < f b): (merge l1 l2).2 = (merge (l1.map f) (l2.map f)).2 := by
+  induction' h:l1.length+l2.length with n ih generalizing l1 l2
+  · unfold merge
+    cases l1 with
+    | nil =>
+      cases l2 with
+      | nil => simp
+      | cons hd tl => simp at h
+    | cons hd tl => simp at h
+
+  · unfold merge
+    cases l1 with
+    | nil =>
+      cases l2 with
+      | nil => simp at h
+      | cons hd tl => simp
+    | cons hd tl =>
+      cases l2 with
+      | nil => simp
+      | cons hd' tl' =>
+        simp
+        split
+        · rename_i hd_hd'
+          have f_hd_f_hd': f hd < f hd' := strictMonotone hd hd' hd_hd'
+          simp [f_hd_f_hd']
+          rw [ih]
+          simp
+
+          simp at h
+          rw [Nat.add_comm tl.length, Nat.add_assoc, Nat.add_comm 1] at h
+          simp at h
+          simp
+          exact h
+        · rename_i hd_hd'
+          have f_hd_f_hd': ¬ f hd < f hd' := by
+            simp at hd_hd'
+            rw [le_iff_lt_or_eq] at hd_hd'
+            cases hd_hd' with
+            | inl h =>
+              apply strictMonotone at h
+              by_contra
+              rename_i h'
+              apply lt_total _ _ h h'
+            | inr h =>
+              rw [h]
+              simp
+          simp[f_hd_f_hd']
+          rw[ih]
+          simp
+          simp
+          simp at h
+          rw [Nat.add_comm tl.length, Nat.add_assoc, Nat.add_comm 1] at h
+          simp at h
+          rw [← h]
+          rw [Nat.add_comm tl'.length 1, Nat.add_assoc]
+
+
 --inspired by haskells terminology
 def take (l: List A)(n: ℕ): List A :=
   match n with
@@ -136,7 +359,7 @@ lemma drop_length (l: List A)(n: ℕ)(h: n ≤ l.length): (drop l n).length = l.
 
 def split (l: List A) (n: ℕ): List A × List A := (take l n, drop l n)
 
---#eval split [1,2,3,4,5] 2
+--#eval split [1,2,3,4,5, 6] 3
 
 lemma splitLen1 (l: List A) (h: l.length > 0): (split l (Nat.div l.length 2)).1.length < l.length := by
   unfold split
@@ -169,6 +392,9 @@ lemma splitLen2 (l: List A) (h: l.length > 1): (split l (Nat.div l.length 2)).2.
   apply Nat.zero_lt_of_lt
   apply h
 
+lemma split_append (l1 l2: List A) (h: l1.length = l2.length): split (l1++l2) (l1.length + l1.length) = (l1,l2) := by
+  sorry
+
 
 
 def MergeSort (l: List A) : (List A × ℕ) :=
@@ -196,9 +422,22 @@ decreasing_by
   simp at h
   exact h
 
-lemma mergeSortKeepsLength (l: List A): l.length = (MergeSort l).1.length := by
-  induction l.length using Nat.strongInductionOn generalizing l
-  sorry
+lemma mergeSortKeepsLength (l: List A): (MergeSort l).1.length = l.length := by
+  induction' h:l.length  using Nat.strongInductionOn with n ih generalizing l
+  cases l with
+  | nil => simp[← h, MergeSort]
+  | cons hd tl =>
+    unfold MergeSort
+    split
+    · rw [h]
+    · simp
+      rw [merge_length]
+      unfold split
+      rw [← h]
+      simp
+      sorry
+
+
 
 def isWorstCaseMergeSort (l: List A): Prop :=
   if l.length <= 1
@@ -212,5 +451,50 @@ def isWorstCaseMergeSort (l: List A): Prop :=
 termination_by l.length
 decreasing_by
   simp_wf
-  sorry
-  sorry
+  rw [mergeSortKeepsLength]
+  apply splitLen1
+  rename_i h
+  simp at h
+  apply Nat.lt_trans _ h
+  simp
+  simp_wf
+  rw [mergeSortKeepsLength]
+  apply splitLen2
+  rename_i h
+  simp at h
+  exact h
+
+def worstCaseArray (k: ℕ): List ℕ :=
+  match k with
+  | 0 => [1]
+  | Nat.succ m =>
+    (worstCaseArray m).map (fun x => 2*x) ++ (worstCaseArray m).map (fun x => 2*x+1)
+
+lemma worstCaseArray_length (k: ℕ) (h: k > 0): (worstCaseArray k).length > 1 := by
+  induction k with
+  | zero => simp at h
+  | succ m ih=>
+    unfold worstCaseArray
+    simp
+    cases m with
+    | zero => simp[worstCaseArray]
+    | succ n =>
+      simp at ih
+      exact Nat.lt_add_right (worstCaseArray (n + 1)).length ih
+
+theorem worstCaseArrayIsWorstCase (k: ℕ): isWorstCaseMergeSort (worstCaseArray k) := by
+  induction k with
+  | zero => simp[worstCaseArray, isWorstCaseMergeSort]
+  | succ m ih=>
+    unfold isWorstCaseMergeSort
+    have len: ¬ (worstCaseArray (m + 1)).length ≤ 1 := by
+      simp
+      apply worstCaseArray_length
+      simp
+    split
+    · rename_i h
+      contradiction
+    · simp
+      unfold worstCaseArray
+      simp
+      admit
